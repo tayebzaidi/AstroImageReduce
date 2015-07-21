@@ -52,10 +52,11 @@ def main():
     pool = ThreadPool(processes=cpus)
 
     biasData = pool.map(MasterObject, [bias_list[idx] for idx, _ in enumerate(bias_list)])
-    print len(biasData)
+    #print len(biasData)
 
-    master_bias = np.median(biasData)
-    print master_bias
+    #biasData = np.array([pyfits.getdata("%s" % name) for name in bias_list])
+
+    master_bias = np.median(biasData, axis=0)
 
 if __name__ == '__main__':
     sys.exit(main())
