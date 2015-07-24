@@ -43,20 +43,37 @@ def main():
 
 #    for i, bias in enumerate(bias_list):
 #        print(bias, i)
-
     try:
-        cpus = multiprocessing.cpu_count()
-    except NotImplementedError:
-        cpus = 2   # arbitrary default
+        master_bias = pyfits.getdata('master_bias.fits')
+    except:
+        try:
+            cpus = multiprocessing.cpu_count()
+        except NotImplementedError:
+            cpus = 2   # arbitrary default
+        
+        pool = ThreadPool(processes=cpus)
+
+        biasData = pool.map(MasterObject, [bias_list[idx] for idx, _ in enumerate(bias_list)])
+        print(len(biasData))
+
+        #biasData = np.array([pyfits.getdata("%s" % name) for name in bias_list])
+
+        master_bias = np.median(biasData, axis=0)
+        print(master_bias)
+        print(len(master_bias))
+        hdu = pyfits.PrimaryHDU(master_bias)
+        hdu.header.add_comment("Median of all bias exposures")
+        pyfits.writeto("master_bias.fits", master_bias)
+
+    #Begin flat fielding
+    print("Beginning Flat Fielding")
+    b_flats = []
+    v_flats = []
+    r_flats = []
+    i_flats = []
+
     
-    pool = ThreadPool(processes=cpus)
 
-    biasData = pool.map(MasterObject, [bias_list[idx] for idx, _ in enumerate(bias_list)])
-    #print len(biasData)
-
-    #biasData = np.array([pyfits.getdata("%s" % name) for name in bias_list])
-
-    master_bias = np.median(biasData, axis=0)
 
 if __name__ == '__main__':
     sys.exit(main())
