@@ -10,8 +10,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 def MasterObject(bias_data):
-    biasData_idx = pyfits.getdata("%s" % bias_data)
-    
+    biasData_idx = pyfits.getdata("%s" % bias_data)    
     return biasData_idx
 
 def main():
@@ -21,7 +20,7 @@ def main():
     dt = np.dtype((str, 32))
 
     bias_list = np.zeros(25, dtype=dt)
-    flat_list = np.zeros(40, dtype=dt)
+    flat_list = np.zeros(36, dtype=dt)
     data_list = np.zeros(40, dtype=dt)
 
     bias_counter = 0
@@ -67,12 +66,44 @@ def main():
 
     #Begin flat fielding
     print("Beginning Flat Fielding")
+    flat_data = {}
     b_flats = []
     v_flats = []
     r_flats = []
     i_flats = []
 
+    #Band information is in header dict at entry
+    #'CMMTOBS'.  Change here if necessary
+    for idx,_ in enumerate(flat_list):
+        dataHdr = pyfits.getheader(flat_list[idx])
+        if('B' or 'b') in dataHdr['CMMTOBS']:
+            print(dataHdr['CMMTOBS'])
+            b_flats.append(flat_list[idx])
+        elif('R' or 'r') in dataHdr['CMMTOBS']:
+            r_flats.append(flat_list[idx])
+            print(dataHdr['CMMTOBS'])
+        elif 'V' in dataHdr['CMMTOBS']:
+            v_flats.append(flat_list[idx])
+            print(dataHdr['CMMTOBS'])
+        elif 'I' in dataHdr['CMMTOBS']:
+            i_flats.append(flat_list[idx])
+            print(dataHdr['CMMTOBS'])
+
+    flat_data['b_flats'] = b_flats
+    flat_data['v_flats'] = v_flats
+    flat_data['r_flats'] = r_flats
+    flat_data['i_flats'] = i_flats
+
+    print(flat_data)
     
+    for key, value in flat_data:
+        pyfits.getdata(
+
+    print("Beginning data correction")
+    for idx, _ in enumerate(data_list):
+        dataHdr = pyfits.getheader(data_list[idx])
+        print(dataHdr['CMMTOBS'])
+
 
 
 if __name__ == '__main__':
