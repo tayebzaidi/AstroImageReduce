@@ -9,9 +9,9 @@ import re
 import matplotlib
 import matplotlib.pyplot as plt
 
-def MasterObject(bias_data):
-    biasData_idx = pyfits.getdata("%s" % bias_data)    
-    return biasData_idx
+def MasterObject(data):
+    Data_idx = pyfits.getdata("%s" % data)    
+    return Data_idx
 
 def main():
 
@@ -77,32 +77,52 @@ def main():
     for idx,_ in enumerate(flat_list):
         dataHdr = pyfits.getheader(flat_list[idx])
         if('B' or 'b') in dataHdr['CMMTOBS']:
-            print(dataHdr['CMMTOBS'])
             b_flats.append(flat_list[idx])
         elif('R' or 'r') in dataHdr['CMMTOBS']:
             r_flats.append(flat_list[idx])
-            print(dataHdr['CMMTOBS'])
         elif 'V' in dataHdr['CMMTOBS']:
             v_flats.append(flat_list[idx])
-            print(dataHdr['CMMTOBS'])
         elif 'I' in dataHdr['CMMTOBS']:
             i_flats.append(flat_list[idx])
-            print(dataHdr['CMMTOBS'])
 
     flat_data['b_flats'] = b_flats
     flat_data['v_flats'] = v_flats
     flat_data['r_flats'] = r_flats
     flat_data['i_flats'] = i_flats
 
-    print(flat_data)
     
-    for key, value in flat_data:
-        pyfits.getdata(
+    try:
+        master_flats = {}
+        for key, values in flat_data.items():
+            filename = 'master_flat_{}.fits'.format(key[0])
+            master_flats[key[0]] = pyfits.getdata(filename)
+        print("Flat files have been read in")
+    except:
+        try:
+            cpus = multiprocessing.cpu_count()
+            print("CPU number acquired: {}".format(cpus))
+        except NotImplementedError:
+            cpus = 2   # arbitrary default
+            
+        for key, values in flat_data.items():
+            print(key, values)
+            pool = ThreadPool(processes=cpus)
 
-    print("Beginning data correction")
-    for idx, _ in enumerate(data_list):
-        dataHdr = pyfits.getheader(data_list[idx])
-        print(dataHdr['CMMTOBS'])
+            flatData = pool.map(MasterObject, [values[idx] for idx, _ in enumerate(values)])
+            
+            master_flat = np.median(flatData, axis=0)
+            print(len(master_flat))
+            hdu = pyfits.PrimaryHDU(master_flat)
+            hdu.header.add_comment("Median of all flat exposures for given band")
+            print(key[0])
+            filename = "master_flat_{0}.fits".format(key[0])
+            print(filename)
+            pyfits.writeto(filename, master_flat)
+
+#    print("Beginning data correction")
+#    for idx, _ in enumerate(data_list):
+#        dataHdr = pyfits.getheader(data_list[idx])
+#        print(dataHdr['CMMTOBS'])
 
 
 
