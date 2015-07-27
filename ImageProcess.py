@@ -21,7 +21,7 @@ def main():
 
     bias_list = np.zeros(25, dtype=dt)
     flat_list = np.zeros(36, dtype=dt)
-    data_list = np.zeros(40, dtype=dt)
+    data_list = np.zeros(32, dtype=dt)
 
     bias_counter = 0
     flat_counter = 0
@@ -52,8 +52,8 @@ def main():
         
         pool = ThreadPool(processes=cpus)
 
-        biasData = pool.map(MasterObject, [bias_list[idx] for idx, _ in enumerate(bias_list)])
-        print(len(biasData))
+        biasData = np.array(pool.map(MasterObject, [bias_list[idx] for idx, _ in enumerate(bias_list)]))
+        print(biasData.shape)
 
         #biasData = np.array([pyfits.getdata("%s" % name) for name in bias_list])
 
@@ -96,6 +96,8 @@ def main():
         for key, values in flat_data.items():
             filename = 'master_flat_{}.fits'.format(key[0])
             master_flats[key[0]] = pyfits.getdata(filename)
+            print(key[0])
+            print(master_flats[key[0]])
         print("Flat files have been read in")
     except:
         try:
@@ -108,10 +110,19 @@ def main():
             print(key, values)
             pool = ThreadPool(processes=cpus)
 
-            flatData = pool.map(MasterObject, [values[idx] for idx, _ in enumerate(values)])
-            
-            master_flat = np.median(flatData, axis=0)
-            print(len(master_flat))
+            flatData_raw = np.array(pool.map(MasterObject, [values[idx] for idx, _ in enumerate(values)]))
+            print(flatData_raw.shape)
+            #make sure to debias the raw flat
+            dbflat = flatData_raw - master_bias
+            #take the median of the values
+            flat = np.median(dbflat, axis=0)
+            #normalize the flat values
+            print(np.mean(np.reshape(flat, flat.size)))
+            print("Size of flat: {}".format(flat.size))
+            master_flat = flat / np.median(np.reshape(flat, flat.size))
+            print("Median of flat is: {}".format(np.median(master_flat)))
+            print("Mean of flat is: {}".format(np.mean(master_flat)))
+            print(master_flat.shape)
             hdu = pyfits.PrimaryHDU(master_flat)
             hdu.header.add_comment("Median of all flat exposures for given band")
             print(key[0])
@@ -119,10 +130,53 @@ def main():
             print(filename)
             pyfits.writeto(filename, master_flat)
 
-#    print("Beginning data correction")
-#    for idx, _ in enumerate(data_list):
-#        dataHdr = pyfits.getheader(data_list[idx])
-#        print(dataHdr['CMMTOBS'])
+    print("Beginning image data correction")
+    data_dict = {}
+    b_data = []
+    v_data = []
+    r_data = []
+
+    for idx, _ in enumerate(data_list):
+        dataHdr = pyfits.getheader(data_list[idx])
+        print(data_list[idx][13:15])
+        if int(data_list[idx][13:15]) >= 21:
+            if 'B' in dataHdr['CMMTOBS']:
+                b_data.append(data_list[idx])
+                print(data_list[idx], dataHdr['CMMTOBS'])
+            elif 'V' in dataHdr['CMMTOBS']:
+                v_data.append(data_list[idx])
+                print(data_list[idx], dataHdr['CMMTOBS'])
+            elif 'R' in dataHdr['CMMTOBS']:
+                r_data.append(data_list[idx])
+                print(data_list[idx], dataHdr['CMMTOBS'])
+
+    data_dict['b_data'] = b_data
+    data_dict['v_data'] = v_data
+    data_dict['r_data'] = r_data
+
+    try:
+        cpus = multiprocessing.cpu_count()
+    except NotImplementedError:
+        cpus = 2   # arbitrary default
+        
+    for key, values in data_dict.items():
+        print(key, values)
+        pool = ThreadPool(processes=cpus)
+
+        data_raw = np.array(pool.map(MasterObject, [values[idx] for idx, _ in enumerate(values)]))
+        
+        #make sure to debias the raw data
+        dbdata = data_raw - master_bias
+        #normalize the data values according to the relevant master flat
+        print(master_flats[key[0]])
+        master_data = dbdata / master_flats[key[0]]
+        master_data_median = np.median(master_data, axis=0)
+        hdu = pyfits.PrimaryHDU(master_data_median)
+        hdu.header.add_comment("Debiased and flat fielded image")
+        filename = "master_data_{0}.fits".format(key[0])
+        print(filename)
+        pyfits.writeto(filename, master_data_median)
+        
 
 
 
